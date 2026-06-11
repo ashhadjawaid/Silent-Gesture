@@ -1,0 +1,11 @@
+# Ignore runtime SQLite database
+database.sqlite
+
+# Ignore local PHP binaries
+php_bin/
+php.zip
+
+# Ignore IDE specific folders
+.gemini/
+.vscode/
+*.log

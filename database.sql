@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS `emergency_logs` (
   `time` TIME NOT NULL,
   `status` VARCHAR(50) NOT NULL, -- e.g., 'Emergency Active', 'Cancelled'
   `gesture_used` VARCHAR(50) NOT NULL,
+  `location` VARCHAR(100) DEFAULT 'Available',
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

@@ -38,6 +38,9 @@ $gesture_emoji = $gesture_emojis[$current_gesture] ?? '✌️';
     <!-- FontAwesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <!-- MediaPipe Hands CDN scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <style>
         body {
             background-color: #f3f4f6; /* Dashboard main area has light background with cards */
@@ -206,9 +209,12 @@ $gesture_emoji = $gesture_emojis[$current_gesture] ?? '✌️';
                 <div class="camera-container">
                     
                     <!-- Overlay Status -->
-                    <div class="camera-overlay">
+                    <div class="camera-overlay d-flex flex-column gap-2">
                         <span class="badge bg-success p-2 text-uppercase" id="feed-badge">
                             <i class="fa-solid fa-video me-1"></i> Live feed
+                        </span>
+                        <span class="badge bg-secondary p-2" id="detected-gesture-text" style="font-size: 11px; text-transform: uppercase;">
+                            Detected: None
                         </span>
                     </div>
 
@@ -246,7 +252,7 @@ $gesture_emoji = $gesture_emojis[$current_gesture] ?? '✌️';
             <div class="col-lg-4">
                 <div class="row g-3 h-100">
                     <div class="col-12 col-md-6 col-lg-12">
-                        <a href="#" class="action-card" onclick="alert('Emergency Contacts Page is assigned to another team member.')">
+                        <a href="contacts.php" class="action-card">
                             <div class="action-icon"><i class="fa-solid fa-address-book"></i></div>
                             <h5 class="fw-bold mb-1">Emergency Contacts</h5>
                             <p class="text-muted small mb-0">Add/remove trusted safety contacts</p>
@@ -254,7 +260,7 @@ $gesture_emoji = $gesture_emojis[$current_gesture] ?? '✌️';
                     </div>
                     
                     <div class="col-12 col-md-6 col-lg-12">
-                        <a href="#" class="action-card" onclick="alert('Alert History Page is assigned to another team member.')">
+                        <a href="alert_history.php" class="action-card">
                             <div class="action-icon"><i class="fa-solid fa-clock-rotate-left"></i></div>
                             <h5 class="fw-bold mb-1">Alert History</h5>
                             <p class="text-muted small mb-0">Review previous alert timestamps & logs</p>
@@ -277,22 +283,95 @@ $gesture_emoji = $gesture_emojis[$current_gesture] ?? '✌️';
 
     <!-- Footer -->
     <div class="footer-text" style="color: rgba(0,0,0,0.5);">
-        <p>&copy; 2026 Silent Gesture Emergency Safety Web Application. All rights reserved.</p>
-    </div>
-
-    <!-- JavaScript to request webcam and handle mock simulation -->
+        <p>&copy; 2026 Silent Gesture Emergency Safety Web Application. All rights reserved. | <a href="admin_login.php" style="color: rgba(0,0,0,0.6); text-decoration: none;">Admin Porta    <!-- JavaScript to request webcam, load MediaPipe, and handle gesture recognition -->
     <script>
+        let isEmergencyTriggered = false;
+        let gestureHoldStartTime = null;
+        const REQUIRED_HOLD_TIME_MS = 3000;
+        const targetGesture = '<?php echo h($current_gesture); ?>';
+
+        function classifyGesture(landmarks) {
+            // Check if fingers are up (y is inverted in MediaPipe, smaller y means higher in coordinate space)
+            const indexUp = landmarks[8].y < landmarks[6].y;
+            const middleUp = landmarks[12].y < landmarks[10].y;
+            const ringUp = landmarks[16].y < landmarks[14].y;
+            const pinkyUp = landmarks[20].y < landmarks[18].y;
+            
+            // For thumb: extended when TIP is higher (smaller y) than IP & MCP
+            const thumbUp = landmarks[4].y < landmarks[3].y && landmarks[3].y < landmarks[2].y;
+            
+            // Count standard fingers up (excluding thumb)
+            const fingersUpCount = (indexUp ? 1 : 0) + (middleUp ? 1 : 0) + (ringUp ? 1 : 0) + (pinkyUp ? 1 : 0);
+            
+            // 1. Fist: All fingers are folded down, thumb not up
+            if (fingersUpCount === 0 && !thumbUp) {
+                return "Fist";
+            }
+            
+            // 2. Thumbs Up: Thumb is up, all other fingers closed
+            if (thumbUp && fingersUpCount === 0) {
+                return "Thumbs Up";
+            }
+            
+            // 3. One Finger: Index finger up, others folded down
+            if (indexUp && fingersUpCount === 1 && !thumbUp) {
+                return "One Finger";
+            }
+            
+            // 4. Two Fingers: Index & Middle fingers up, others folded down
+            if (indexUp && middleUp && fingersUpCount === 2 && !thumbUp) {
+                return "Two Fingers";
+            }
+            
+            return "Unknown";
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
             const webcam = document.getElementById('webcam');
             const viewport = document.getElementById('camera-viewport');
             
-            // Attempt to access user camera to prove camera permission validation works!
+            // Attempt to access user camera
             <?php if ($_SESSION['camera_enabled']): ?>
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 webcam.srcObject = stream;
                 webcam.classList.remove('d-none');
                 viewport.classList.add('d-none');
+                
+                // If MediaPipe is loaded, start tracking
+                if (typeof Hands !== 'undefined') {
+                    webcam.onloadeddata = () => {
+                        const hands = new Hands({
+                            locateFile: (file) => {
+                                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+                            }
+                        });
+
+                        hands.setOptions({
+                            maxNumHands: 1,
+                            modelComplexity: 1,
+                            minDetectionConfidence: 0.6,
+                            minTrackingConfidence: 0.6
+                        });
+
+                        hands.onResults(onHandResults);
+
+                        async function sendFrame() {
+                            if (webcam && !webcam.paused && webcam.srcObject && !isEmergencyTriggered) {
+                                try {
+                                    await hands.send({ image: webcam });
+                                } catch (e) {
+                                    console.error("MediaPipe Hands processing error:", e);
+                                }
+                            }
+                            requestAnimationFrame(sendFrame);
+                        }
+                        sendFrame();
+                    };
+                } else {
+                    console.warn("MediaPipe Hands library failed to load or is offline. Operating in simulation-only mode.");
+                    document.getElementById('detected-gesture-text').textContent = "Offline Mode (Simulation Active)";
+                }
             } catch (err) {
                 console.error("Camera access failed: ", err);
                 let messageTitle = "Camera Access Blocked";
@@ -320,23 +399,88 @@ $gesture_emoji = $gesture_emojis[$current_gesture] ?? '✌️';
             <?php endif; ?>
         });
 
-        function triggerMockEmergency() {
+        function onHandResults(results) {
+            const badge = document.getElementById('system-status');
+            const feedBadge = document.getElementById('feed-badge');
+            
+            if (isEmergencyTriggered) return;
+
+            let detectedGesture = "None";
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                detectedGesture = classifyGesture(landmarks);
+                document.getElementById('detected-gesture-text').textContent = "Detected: " + detectedGesture;
+            } else {
+                document.getElementById('detected-gesture-text').textContent = "Detected: None";
+            }
+
+            // Verify if the active gesture matches the configured target gesture
+            if (detectedGesture === targetGesture) {
+                if (gestureHoldStartTime === null) {
+                    gestureHoldStartTime = Date.now();
+                    badge.className = 'status-badge status-active bg-warning text-dark border-warning animate-pulse';
+                    badge.innerHTML = `
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Validating gesture (hold 3s)...</span>
+                    `;
+                } else {
+                    const elapsed = Date.now() - gestureHoldStartTime;
+                    if (elapsed >= REQUIRED_HOLD_TIME_MS) {
+                        gestureHoldStartTime = null;
+                        triggerRealEmergency("Webcam Gesture");
+                    }
+                }
+            } else {
+                // If user drops the gesture or shows a wrong gesture, reset hold validation
+                if (gestureHoldStartTime !== null) {
+                    gestureHoldStartTime = null;
+                    badge.className = 'status-badge status-active';
+                    badge.innerHTML = `
+                        <span class="spinner-grow spinner-grow-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Monitoring Active</span>
+                    `;
+                }
+            }
+        }
+
+        function triggerRealEmergency(triggerType = "Manual Simulation") {
+            isEmergencyTriggered = true;
             const badge = document.getElementById('system-status');
             const feedBadge = document.getElementById('feed-badge');
             const cancelBtn = document.getElementById('btn-cancel-demo');
             
-            // Toggle active status UI
-            badge.className = 'status-badge status-emergency';
-            badge.innerHTML = `
-                <span class="spinner-grow spinner-grow-sm me-2" role="status" aria-hidden="true"></span>
-                <span>🔴 Emergency Active</span>
-            `;
-            
-            feedBadge.className = 'badge bg-danger p-2 text-uppercase';
-            feedBadge.innerHTML = '<i class="fa-solid fa-triangle-exclamation me-1 animate-flash"></i> Alert Sent';
-            
-            cancelBtn.classList.remove('d-none');
-            alert("Correct Gesture Detected and Validated for 3 Seconds! Emergency Mode activated silently.");
+            fetch('trigger_emergency.php', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        badge.className = 'status-badge status-emergency';
+                        badge.innerHTML = `
+                            <span class="spinner-grow spinner-grow-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>🔴 Emergency Active</span>
+                        `;
+                        
+                        feedBadge.className = 'badge bg-danger p-2 text-uppercase';
+                        feedBadge.innerHTML = '<i class="fa-solid fa-triangle-exclamation me-1 animate-flash"></i> Alert Sent';
+                        
+                        cancelBtn.classList.remove('d-none');
+                        
+                        alert(`SILENT EMERGENCY ALERT SENT!\nTrigger Method: ${triggerType}\nCorrect gesture '${data.log.gesture}' detected and held for 3 seconds!\nEmergency logged at: ${data.log.location}`);
+                    } else {
+                        isEmergencyTriggered = false;
+                        alert("Error logging emergency: " + data.message);
+                    }
+                })
+                .catch(err => {
+                    isEmergencyTriggered = false;
+                    console.error("AJAX error logging emergency: ", err);
+                    alert("Network error: Could not record emergency log.");
+                });
+        }
+
+        function triggerMockEmergency() {
+            // Bypass camera ML and trigger emergency instantly (used for mock testing/offline)
+            triggerRealEmergency("Mock Trigger Button");
         }
 
         function cancelMockEmergency() {
@@ -344,17 +488,31 @@ $gesture_emoji = $gesture_emojis[$current_gesture] ?? '✌️';
             const feedBadge = document.getElementById('feed-badge');
             const cancelBtn = document.getElementById('btn-cancel-demo');
             
-            // Restore active status UI
-            badge.className = 'status-badge status-active';
-            badge.innerHTML = `
-                <span class="spinner-grow spinner-grow-sm me-2" role="status" aria-hidden="true"></span>
-                <span>Monitoring Active</span>
-            `;
-            
-            feedBadge.className = 'badge bg-success p-2 text-uppercase';
-            feedBadge.innerHTML = '<i class="fa-solid fa-video me-1"></i> Live feed';
-            
-            cancelBtn.classList.add('d-none');
+            fetch('cancel_emergency.php', { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        isEmergencyTriggered = false;
+                        gestureHoldStartTime = null;
+                        
+                        badge.className = 'status-badge status-active';
+                        badge.innerHTML = `
+                            <span class="spinner-grow spinner-grow-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Monitoring Active</span>
+                        `;
+                        
+                        feedBadge.className = 'badge bg-success p-2 text-uppercase';
+                        feedBadge.innerHTML = '<i class="fa-solid fa-video me-1"></i> Live feed';
+                        
+                        cancelBtn.classList.add('d-none');
+                    } else {
+                        alert("Error resetting emergency: " + data.message);
+                    }
+                })
+                .catch(err => {
+                    console.error("AJAX error resetting emergency: ", err);
+                    alert("Network error: Could not cancel active emergency.");
+                });
         }
     </script>
 

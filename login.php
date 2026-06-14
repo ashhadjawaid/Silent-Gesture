@@ -137,12 +137,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <form action="login.php" method="POST" autocomplete="off">
                     <div class="mb-3">
                         <label for="email" class="form-label">Email Address</label>
-                        <input type="email" class="form-control" id="email" name="email" placeholder="john@example.com" value="<?php echo h($email); ?>" required>
+                        <input type="email" class="form-control" id="email" name="email" placeholder="Enter your email" value="<?php echo h($email); ?>" required>
                     </div>
 
                     <div class="mb-3">
                         <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" name="password" placeholder="••••••••" required>
+                        <input type="password" class="form-control" id="password" name="password" placeholder="Enter your password" required>
                     </div>
 
                     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -161,6 +161,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <span class="text-muted">Don't have an account? </span>
                         <a href="register.php" class="text-decoration-none fw-semibold">Register</a>
                     </div>
+
+                    <div class="text-center mt-2 border-top pt-2">
+                        <a href="admin_login.php" class="text-decoration-none small fw-semibold text-secondary">Are you an Admin? Admin Portal</a>
+                    </div>
                 </form>
             </div>
         </div>
@@ -168,7 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <!-- Footer -->
     <div class="footer-text">
-        <p>&copy; 2026 Silent Gesture Emergency Safety Web Application. All rights reserved.</p>
+        <p>&copy; 2026 Silent Gesture Emergency Safety Web Application. All rights reserved. | <a href="admin_login.php">Admin Portal</a></p>
     </div>
 
     <!-- Bootstrap JS -->

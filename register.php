@@ -144,27 +144,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <form action="register.php" method="POST" autocomplete="off">
                     <div class="mb-3">
                         <label for="name" class="form-label">Full Name</label>
-                        <input type="text" class="form-control" id="name" name="name" placeholder="John Doe" value="<?php echo h($name); ?>" required>
+                        <input type="text" class="form-control" id="name" name="name" placeholder="Enter your full name" value="<?php echo h($name); ?>" required>
                     </div>
 
                     <div class="mb-3">
                         <label for="email" class="form-label">Email Address</label>
-                        <input type="email" class="form-control" id="email" name="email" placeholder="john@example.com" value="<?php echo h($email); ?>" required>
+                        <input type="email" class="form-control" id="email" name="email" placeholder="Enter your email" value="<?php echo h($email); ?>" required>
                     </div>
 
                     <div class="mb-3">
                         <label for="phone" class="form-label">Phone Number</label>
-                        <input type="tel" class="form-control" id="phone" name="phone" placeholder="0300-1234567" value="<?php echo h($phone); ?>" required>
+                        <input type="tel" class="form-control" id="phone" name="phone" placeholder="Enter your phone number" value="<?php echo h($phone); ?>" required>
                     </div>
 
                     <div class="mb-3">
                         <label for="password" class="form-label">Password</label>
-                        <input type="password" class="form-control" id="password" name="password" placeholder="••••••••" required>
+                        <input type="password" class="form-control" id="password" name="password" placeholder="Enter your password" required>
                     </div>
 
                     <div class="mb-4">
                         <label for="confirm_password" class="form-label">Confirm Password</label>
-                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" placeholder="••••••••" required>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" placeholder="Confirm your password" required>
                     </div>
 
                     <div class="d-grid mb-3">

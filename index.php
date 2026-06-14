@@ -222,7 +222,7 @@ require_once 'config.php';
 
     <!-- Footer -->
     <div class="footer-text">
-        <p>&copy; 2026 Silent Gesture Emergency Safety Web Application. All rights reserved.</p>
+        <p>&copy; 2026 Silent Gesture Emergency Safety Web Application. All rights reserved. | <a href="admin_login.php">Admin Portal</a></p>
     </div>
 
     <!-- Bootstrap JS -->

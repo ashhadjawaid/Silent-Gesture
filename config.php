@@ -12,6 +12,13 @@ if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
 }
 
 if (session_status() == PHP_SESSION_NONE) {
+    // Differentiate session name for admin and user portals to prevent cookie collisions on localhost
+    $current_script = basename($_SERVER['SCRIPT_NAME'] ?? '');
+    if (strpos($current_script, 'admin_') === 0) {
+        session_name('SILENT_GESTURE_ADMIN_SESS');
+    } else {
+        session_name('SILENT_GESTURE_USER_SESS');
+    }
     session_start();
 }
 
@@ -91,8 +98,20 @@ function create_sqlite_tables($pdo) {
         time TEXT NOT NULL,
         status TEXT NOT NULL,
         gesture_used TEXT NOT NULL,
+        location TEXT DEFAULT 'Available',
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )");
+
+    // Ensure 'location' column exists (migration helper for existing databases)
+    try {
+        $pdo->exec("SELECT location FROM emergency_logs LIMIT 1");
+    } catch (PDOException $e) {
+        try {
+            $pdo->exec("ALTER TABLE emergency_logs ADD COLUMN location TEXT DEFAULT 'Available'");
+        } catch (PDOException $e2) {
+            // Ignore error if it somehow failed
+        }
+    }
 
     // 5. Admin table
     $pdo->exec("CREATE TABLE IF NOT EXISTS admin (
@@ -165,5 +184,22 @@ function get_user_gesture($user_id) {
  */
 function h($string) {
     return htmlspecialchars($string, ENT_QUOTES, 'UTF-8');
+}
+
+/**
+ * Check if the admin is authenticated
+ */
+function is_admin_authenticated() {
+    return isset($_SESSION['admin_id']);
+}
+
+/**
+ * Require admin authentication or redirect to admin login
+ */
+function require_admin_auth() {
+    if (!is_admin_authenticated()) {
+        header("Location: admin_login.php");
+        exit;
+    }
 }
 ?>
